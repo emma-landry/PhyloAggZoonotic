@@ -1,0 +1,446 @@
+---
+title: "Code to reproduce analysis in `Phylogenetic aggregation increases zoonotic potential of mammalian viruses`"
+author: "Andrew W. Park"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r libLoad}
+library(tidyverse)
+library(magrittr)
+library(ape)
+library(taxize)
+library(picante)
+```
+
+```{r dataLoad}
+v <- read_csv("viruses.csv")
+g <- read_csv("GMPD_main.csv")
+a <- read_csv("associations.csv")
+h <- read_csv("hosts.csv")
+```
+
+```{r commonViruses}
+g %<>% filter(ParType=="Virus")
+g %<>% mutate(ParasiteCorrectedName=gsub(" ","_",ParasiteCorrectedName))
+g %<>% mutate(HostCorrectedName=gsub(" ","_",HostCorrectedName))
+
+for (i in 1:dim(g)[1]){
+  z <- strsplit(g$ParasiteCorrectedName[i],"_")
+  z <- unlist(z)
+  z <- z[-1]
+  z <- paste(z,collapse="_")
+  g$ParasiteCorrectedName[i] <- z
+}
+
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Alcelaphine_gammaherpesvirus_1","Alcelaphine_herpesvirus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Bakau_orthobunyavirus","Bakau_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Bunyamwera_orthobunyavirus","Bunyamwera_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Bwamba_orthobunyavirus","Bwamba_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"California_encephalitis_orthobunyavirus","California_encephalitis_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Canid_alphaherpes_virus_1","Canid_herpes_virus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Caprine_alphaherpes_virus_1","Caprine_herpes_virus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Caraparu_orthobunyavirus","Caraparu_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Catu_orthobunyavirus","Catu_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Cercopithecine_alphaherpesvirus_9","Cercopithecine_herpesvirus_9"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Cervid_alphaherpesvirus_1","Cervid_herpesvirus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Cervid_alphaherpesvirus_2","Cervid_herpesvirus_2"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Cetacean_morbillivirus","Cetacean_morbillivirus_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Chandipura_vesiculovirus","Chandipura_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Crimean-Congo_hemorrhagic_fever_nairovirus","Crimean-Congo_hemorrhagic_fever_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Equid_alphaherpesvirus_1","Equid_herpesvirus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Equid_alphaherpesvirus_4","Equid_herpesvirus_4"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Equid_alphaherpesvirus_9","Equid_herpesvirus_9"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Felid_alphaherpesvirus_1","Felid_herpesvirus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Guama_orthobunyavirus","Guama_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Human_alphaherpesvirus_1","Human_herpesvirus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Human_alphaherpesvirus_2","Human_herpesvirus_2"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Kairi_orthobunyavirus","Kairi_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Lymphocytic_choriomeningitis_mammarenavirus","Lymphocytic_choriomeningitis_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Main_Drain_orthobunyavirus","Main_Drain_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Marituba_orthobunyavirus","Marituba_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Mustelid_gammaherpesvirus_1","Mustelid_herpesvirus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Oriboca_orthobunyavirus","Oriboca_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Ovine_gammaherpesvirus_2","Ovine_herpesvirus_2"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Phocid_alphaherpes_virus_1","Phocid_herpes_virus_1"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Rift_Valley_phlebovirus","Rift_Valley_fever_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Sathuperi_orthobunyavirus","Sathuperi_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Semliki_forest_virus","Semliki_Forest_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Shamonda_orthobunyavirus","Shamonda_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Shuni_orthobunyavirus","Shuni_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Simbu_orthobunyavirus","Simbu_virus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Simian_adenovirus_A","Simian_adenovirus"))
+g %<>% mutate(ParasiteCorrectedName=str_replace_all(ParasiteCorrectedName,"Thiafora_nairovirus","Thiafora_virus"))
+
+
+commonViruses <- intersect(v$vVirusNameCorrected,g$ParasiteCorrectedName)
+```
+
+
+```{r combinedHostRange}
+
+h %<>% select(hHostNameFinal,hOrder)
+a %<>% left_join(.,h)
+
+a %<>% mutate(hOrder=tools::toTitleCase(tolower(hOrder)))
+
+a4mrg <- a %>% select(hHostNameFinal,vVirusNameCorrected,hOrder)
+a4mrg %<>% rename(host=hHostNameFinal,virus=vVirusNameCorrected,order=hOrder)
+g4mrg <- g %>% select(HostCorrectedName,ParasiteCorrectedName,HostOrder)
+g4mrg %<>% rename(host=HostCorrectedName,virus=ParasiteCorrectedName,order=HostOrder)
+g4mrg %<>% distinct()
+```
+
+```{r eval=F}
+q <- bind_rows(a4mrg,g4mrg)
+
+vZoo <- v %>% select(vVirusNameCorrected,IsZoonotic.stringent)
+vZoo %<>% rename(virus=vVirusNameCorrected,zoo=IsZoonotic.stringent)
+
+q %<>% left_join(.,vZoo)
+
+q %<>% filter(!virus=="")
+q %<>% filter(grepl("sp\\.",virus)==F)
+
+q$order <- gsub("Cetartiodactyla","Artiodactyla",q$order)
+ho <- q %>% select(host,order) %>% distinct()
+
+
+
+# add in the EID2 data
+e <- read_csv("SpeciesInteractions_EID2.csv")
+e %<>% filter(`Cargo classification`=="Virus" & `Carrier classification`%in%c("Mammal","Primate","Rodent"))
+e %<>% drop_na(Sequences)
+
+e %<>% rename(virus=`Cargo`)
+e %<>% mutate(virus=str_replace_all(virus," ","_"))
+e %<>% mutate(virus=str_to_sentence(virus))
+
+e %<>% rename(host=Carrier)
+e %<>% mutate(host=str_replace_all(host," ","_"))
+e %<>% mutate(host=str_to_sentence(host))
+
+e %<>% rename(order=`Carrier classification`)
+e %<>% mutate(order=str_replace_all(order,"Rodent","Rodentia"))
+e %<>% mutate(order=str_replace_all(order,"Primate","Primates"))
+
+e %<>% select(host,virus,order)
+e %<>% left_join(.,vZoo)
+e %<>% drop_na()
+
+# for "e" mammals that only have "mammal" instead of an order, we first cross ref with "q" mammals
+for (i in 1:dim(e)[1]){
+  if (e$order[i]=="Mammal"){
+    idx <- which(ho$host==e$host[i])
+    if (length(idx)>0){
+      e$order[i] <- ho$order[idx]
+    }
+  }
+}
+
+# for remaining "e" mammals, we look up order on gbif
+for (i in 1:dim(e)[1]){
+  if (e$order[i]=="Mammal"){
+    x <- taxize::classification(e$host[i],db="gbif")
+    xx <- x[[1]]
+    e$order[i] <- xx$name[xx$rank=="order"]
+  }
+}
+
+
+q %<>% bind_rows(.,e) %>% distinct()
+```
+
+```{r}
+load("get_q.Rda")
+```
+
+
+
+for each virus, we need the z scores (mpd, max and agg) - without humans
+
+```{r}
+#mammal supertree
+treelist <- read.nexus("ele_1307_sm_sa1.tre")
+#best dates
+tree <- treelist[[1]]
+#dist matrix
+phydist<-cophenetic.phylo(tree) #or can use generic cophenetic
+#which hosts are in the parasite database
+myHosts <- q %>% select(host) %>% distinct() %>% pull()
+
+unMatchedHosts <- setdiff(myHosts,rownames(phydist))
+
+#resolve synonyms
+q$host <- gsub("Aethomys_namaquensis","Micaelamys_namaquensis",q$host)
+# Akodon paranaensis was described as a new species in 2000 (Christoff et al.) but I don't know which species in the genus it can be approximated as
+q$host <- gsub("Alopex_lagopus","Vulpes_lagopus",q$host)
+q$host <- gsub("Artibeus_planirostris","Artibeus_jamaicensis",q$host)
+# Bos gaurus (largest extant bovine) missing from phylogeny. Wonder if it accidentally got subsumsed into Bos taurus?
+q$host <- gsub("Bos_mutus","Bos_grunniens",q$host)
+# Bubalus arnee (wild water buffalo) missing from phylogeny
+q$host <- gsub("Canis_familiaris","Canis_lupus",q$host)
+# Capra aegagrus (wild goat) missing from phylogeny
+q$host <- gsub("Cervus_timorensis","Rusa_timorensis",q$host)
+q$host <- gsub("Choeropsis_liberiensis","Hexaprotodon_liberiensis",q$host)
+q$host <- gsub("Equus_quagga","Equus_burchellii",q$host)
+q$host <- gsub("Felis_concolor","Puma_concolor",q$host)
+q$host <- gsub("Handleyomys_alfaroi","Oryzomys_alfaroi",q$host)
+q$host <- gsub("Herpestes_sanguineus","Galerella_sanguinea",q$host)
+q$host <- gsub("Hylaeamys_laticeps","Oryzomys_laticeps",q$host)
+q$host <- gsub("Hylaeamys_megacephalus","Oryzomys_megacephalus",q$host)
+# Lama pacos (alpaca) missing from phylogeny
+q$host <- gsub("Mico_leucippe","Callithrix_leucippe",q$host)
+q$host <- gsub("Miniopterus_fuliginosus","Miniopterus_schreibersii",q$host) # changed in 2004 Tian et al. Folia Zoologica
+q$host <- gsub("Myotis_pilosus","Myotis_ricketti",q$host)
+q$host <- gsub("Nephelomys_albigularis","Oryzomys_albigularis",q$host)
+q$host <- gsub("Ovis_orientalis","Ovis_aries",q$host)
+q$host <- gsub("Physeter_macrocephalus","Physeter_catodon",q$host)
+q$host <- gsub("Procolobus_badius","Piliocolobus_badius",q$host)
+q$host <- gsub("Procolobus_rufomitratus","Piliocolobus_rufomitratus",q$host)
+q$host <- gsub("Pseudalopex_gymnocercus","Lycalopex_gymnocercus",q$host)
+q$host <- gsub("Pseudalopex_vetulus","Lycalopex_vetulus",q$host)
+q$host <- gsub("Rhinolophus_hildebrandti","Rhinolophus_hildebrandtii",q$host)
+q$host <- gsub("Sooretamys_angouya","Oryzomys_angouya",q$host)
+q$host <- gsub("Tadarida_condylura","Mops_condylurus",q$host)
+q$host <- gsub("Tadarida_plicata","Chaerephon_plicatus",q$host)
+q$host <- gsub("Tadarida_pumila","Chaerephon_pumilus",q$host)
+q$host <- gsub("Tragelaphus_oryx","Taurotragus_oryx",q$host)
+q$host <- gsub("Auliscomys_micropus","Loxodontomys_micropus",q$host)
+q$host <- gsub("Bolomys_lasiurus","Necromys_lasiurus",q$host)
+q$host <- gsub("Bubalus_carabanensis","Bubalus_bubalis",q$host)
+q$host <- gsub("Porcula_salvania","Sus_salvanius",q$host)
+q$host <- gsub("Herpailurus_yaguarondi","Puma_yagouaroundi",q$host)
+q$host <- gsub("Otocolobus_manul","Felis_manul",q$host)
+q$host <- gsub("Sus_scrofa_leucomystax","Sus_scrofa",q$host)
+q$host <- gsub("Cervus_alfredi","Rusa_alfredi",q$host)
+q$host <- gsub("Phoca_groenlandica","Pagophilus_groenlandicus",q$host)
+q$host <- gsub("Eothenomys_regulus","Myodes_regulus",q$host)
+# "Bos_primigenius" extinct
+q$host <- gsub("Dusicyon_thous","Cerdocyon_thous",q$host)
+q$host <- gsub("Parastrellus_hesperus","Pipistrellus_hesperus",q$host)
+q$host <- gsub("Proteles_cristatus","Proteles_cristata",q$host)
+q$host <- gsub("Rattus_flavipectus","Rattus_tanezumi",q$host)
+q$host <- gsub("Macaca_balantak","Macaca_fascicularis",q$host) #checked original pub
+q$host <- gsub("Miopithecus_ogouensis","Miopithecus_talapoin",q$host)
+
+
+myHosts <- q %>% select(host) %>% distinct() %>% pull()
+unMatchedHosts <- setdiff(myHosts,rownames(phydist))
+unMatchedHosts <- c(unMatchedHosts,"Homo_sapiens") # add humans here so they are removed from z score calcs
+
+
+
+q %<>% filter(!host %in% unMatchedHosts)
+
+comm <- as.data.frame.matrix(table(q$host,q$virus))
+comm <- 1*(comm>0)
+
+idx <- which(rownames(phydist) %in% q$host)
+phydist.mini <- phydist[idx,idx]
+
+phydist.mini <- phydist.mini[rownames(comm),rownames(comm)]
+```
+
+
+```{r eval=F}
+z1 <- ses.mpd(t(comm),phydist.mini,null.model="independentswap",runs=1000)
+source("ses.maxD.R")
+z2 <- ses.maxD(t(comm),phydist.mini,null.model="independentswap",runs=1000)
+source("ses.mntd.to.maxD.R")
+z3 <- ses.mntd.to.maxD(t(comm),phydist.mini,null.model="independentswap",runs=1000)
+
+z14mrg <- z1 
+z14mrg %<>% mutate(virus=rownames(.))
+z14mrg %<>% rename(z.mpd=mpd.obs.z)
+z14mrg %<>% select(virus,ntaxa,z.mpd)
+
+z24mrg <- z2
+z24mrg %<>% mutate(virus=rownames(.))
+z24mrg %<>% rename(z.max=maxD.obs.z)
+z24mrg %<>% select(virus,z.max)
+
+z34mrg <- z3
+z34mrg %<>% mutate(virus=rownames(.))
+z34mrg %<>% rename(z.agg=mntd.to.maxD.obs.z)
+z34mrg %<>% select(virus,z.agg)
+
+z <- left_join(z14mrg,z24mrg)
+z %<>% left_join(.,z34mrg)
+```
+
+
+```{r}
+load("get_z.Rda")
+```
+
+
+for each virus, we need mean and min dist to human
+
+```{r}
+
+idx <- c(idx,which(rownames(phydist)=="Homo_sapiens"))
+phydist.human <- phydist[idx,idx]
+
+idx.human <- which(rownames(phydist.human)=="Homo_sapiens")
+
+h <- NULL
+for (i in 1:dim(comm)[2]){
+  hostSet <- names(which(comm[,i]==1))
+  phySub <- phydist.human[which(rownames(phydist.human) %in% hostSet),idx.human]
+  avDist <- mean(phySub)
+  minDist <- min(phySub)
+  maxDist <- max(phySub)
+  h <- rbind(h,c(colnames(comm)[i],avDist,minDist,maxDist))
+}
+h %<>% as.data.frame(.)
+names(h) <- c("virus","avDist","minDist","maxDist")
+
+z %<>% left_join(.,h)
+
+```
+
+add zoonotic status
+
+```{r}
+vZoo <- v %>% select(vVirusNameCorrected,IsZoonotic.stringent)
+vZoo %<>% rename(virus=vVirusNameCorrected,zoo=IsZoonotic.stringent)
+z %<>% left_join(.,vZoo)
+z %<>% mutate(avDist=as.numeric(as.character(avDist)),minDist=as.numeric(as.character(minDist)),maxDist=as.numeric(as.character(maxDist)))
+
+z_ <- z %<>% drop_na(zoo,avDist,z.agg,z.max)
+#add virus traits
+
+por <- q %>% select(virus,order) %>% distinct() %>% select(virus) %>% group_by(virus) %>% summarize(nOrd = n())
+z_ %<>% left_join(.,por)
+
+
+v4mrg <- v %>% select(vVirusNameCorrected,vGenomeAveLength,vWOKcites,vPubMedCites,vCytoReplicTF,vSegmentedTF,vVectorYNna,vSSoDS,vDNAoRNA,vEnvelope)
+v4mrg %<>% rename(virus=vVirusNameCorrected)
+z_ %<>% left_join(.,v4mrg)
+
+z_ %<>% mutate(PMcites=log10(1+vPubMedCites))
+
+fig.1 <- z_ %>% drop_na(zoo) %>% ggplot(.,aes(x=avDist,y=z.agg,col=as.factor(zoo)))+geom_point()+geom_smooth(method="lm")+xlab("Average phylogenetic distance of\nhosts to humans (avDist, Ma)")+ylab("Standard effect size for pathogen phylogenetic aggregation (z.agg)")+scale_color_manual(name="Zoonotic",values=c("#56B4E9","#D55E00"))+theme(axis.title.x=element_text(size=14),axis.title.y=element_text(size=14),legend.text=element_text(size=14),axis.text.x=element_text(size=14),axis.text.y=element_text(size=14),legend.title=element_text(size=14))+annotate("text",x=40,y=3.5,label="A",size=12)
+
+
+
+#log cites
+model.1 <- glm(zoo~avDist*(z.agg+z.mpd+z.max)+PMcites,data=z_,family=binomial)
+model.2 <- glm(zoo~avDist*(z.mpd+z.max)+PMcites,data=z_,family=binomial)
+model.3 <- glm(zoo~avDist*(z.agg+z.mpd)+PMcites,data=z_,family=binomial)
+model.4 <- glm(zoo~avDist*(z.agg+z.max)+PMcites,data=z_,family=binomial)
+model.5 <- glm(zoo~avDist*(z.mpd)+PMcites,data=z_,family=binomial)
+model.6 <- glm(zoo~avDist*(z.max)+PMcites,data=z_,family=binomial)
+model.7 <- glm(zoo~avDist*(z.agg)+PMcites,data=z_,family=binomial)
+model.8 <- glm(zoo~avDist+PMcites,data=z_,family=binomial)
+model.9 <- glm(zoo~(z.agg+z.mpd+z.max)+PMcites,data=z_,family=binomial)
+model.10 <- glm(zoo~(z.mpd+z.max)+PMcites,data=z_,family=binomial)
+model.11 <- glm(zoo~(z.agg+z.mpd)+PMcites,data=z_,family=binomial)
+model.12 <- glm(zoo~(z.agg+z.max)+PMcites,data=z_,family=binomial)
+model.13 <- glm(zoo~(z.mpd)+PMcites,data=z_,family=binomial)
+model.14 <- glm(zoo~(z.max)+PMcites,data=z_,family=binomial)
+model.15 <- glm(zoo~(z.agg)+PMcites,data=z_,family=binomial)
+model.16 <- glm(zoo~PMcites,data=z_,family=binomial)
+
+summ.table <- do.call(rbind, lapply(list(model.1, model.2, model.3, model.4, model.5, model.6, model.7, model.8, model.9, model.10,model.11,model.12,model.13,model.14,model.15,model.16), broom::glance))
+
+summ.table$delta.BIC = summ.table$BIC-min(summ.table$BIC)
+sm.tab <- NULL
+for (i in 1:16){
+  modNum=i
+  tmp <- summary(get(paste("model.",i,sep="")))
+  if ("avDist:z.mpd" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="avDist:z.mpd")
+    v1 <- tmp$coefficients[idx,1]
+  }
+  else{v1 <- NA}
+  if ("avDist:z.max" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="avDist:z.max")
+    v2 <- tmp$coefficients[idx,1]
+  }
+  else{v2 <- NA}
+  if ("avDist:z.agg" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="avDist:z.agg")
+    v3 <- tmp$coefficients[idx,1]
+  }
+  else{v3 <- NA}
+  if ("avDist" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="avDist")
+    v4 <- tmp$coefficients[idx,1]
+  }
+  else{v4 <- NA}
+    if ("z.mpd" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="z.mpd")
+    v5 <- tmp$coefficients[idx,1]
+  }
+  else{v5 <- NA}
+    if ("z.max" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="z.max")
+    v6<- tmp$coefficients[idx,1]
+  }
+  else{v6 <- NA}
+    if ("z.agg" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="z.agg")
+    v7 <- tmp$coefficients[idx,1]
+  }
+  else{v7 <- NA}
+    if ("PMcites" %in% names(tmp$aliased)){
+    idx <- which(rownames(tmp$coefficients)=="PMcites")
+    v8 <- tmp$coefficients[idx,1]
+  }
+  else{v8 <- NA}
+  sm.tab <- rbind(sm.tab,c(modNum,v1,v2,v3,v4,v5,v6,v7,v8))
+}
+
+sm.tab <- as.data.frame(sm.tab)
+names(sm.tab) <- c("modNum","avDist:z.mpd","avDist:z.max","avDist:z.agg","avDist","z.mpd","z.max","z.agg","PMcites")
+
+
+
+
+```
+
+
+```{r}
+#USE DNA/RNA as interacting term
+summary(glm(z.agg~vDNAoRNA:(vCytoReplicTF+vSegmentedTF+vEnvelope+vVectorYNna+vSSoDS)+PMcites,data=z_,family=gaussian))
+
+
+library(gridExtra)
+
+
+tab.2a <- table(z_$vDNAoRN,z_$vVectorYNna)
+fig.2a <- z_ %>% drop_na(vVectorYNna) %>% ggplot(.,aes(x=vDNAoRNA,y=z.agg,fill=vVectorYNna))+geom_boxplot()+annotate("text", x = 0.8, y = -1, label = paste("n = ",tab.2a[1,1],sep=""),size=4)+annotate("text", x = 1.2, y = 1.7, label = paste("n = ",tab.2a[1,2],sep=""),size=4)+annotate("text", x = 1.8, y = -1.2, label = paste("n = ",tab.2a[2,1],sep=""),size=4)+annotate("text", x = 2.2, y = -1.3, label = paste("n = ",tab.2a[2,2],sep=""),size=4)+scale_fill_manual(name="  Vectored  ",values=c("#56B4E9","#E69F00"))+xlab("")+ylab(" Standard effect size for pathogen phylogenetic aggregation (z.agg)")+theme(axis.title.y = element_text(hjust=-0.75,vjust=0,color="white"),axis.title.x=element_text(size=14),legend.text=element_text(size=14),axis.text.x=element_text(size=14),axis.text.y=element_text(size=14),legend.title=element_text(size=14))+annotate("text",x=0.7,y=3.0,label="B",size=12)
+
+par(xpd=NA)
+tab.2b <- table(z_$vDNAoRN,z_$vCytoReplicTF)
+fig.2b <- z_ %>% drop_na(vCytoReplicTF) %>% ggplot(.,aes(x=vDNAoRNA,y=z.agg,fill=vCytoReplicTF))+geom_boxplot()+annotate("text", x = 0.8, y = -0.95, label = paste("n = ",tab.2b[1,1],sep=""),size=4)+annotate("text", x = 1.2, y = -0.55, label = paste("n = ",tab.2b[1,2],sep=""),size=4)+annotate("text", x = 1.8, y = -1.2, label = paste("n = ",tab.2b[2,1],sep=""),size=4)+annotate("text", x = 2.19, y = -1.2, label = paste("n = ",tab.2b[2,2],sep=""),size=4)+scale_fill_manual(name="Cytoplasmic\nreplication",values=c("#56B4E9","#E69F00"),labels=c("N","Y"))+xlab("Nucleic acid type")+ylab("Standard effect size for pathogen phylogenetic aggregation (z.agg)")+theme(axis.title.y = element_text(hjust=-0.07,vjust=1,color="black",size=14),axis.title.x=element_text(size=14),legend.text=element_text(size=14),axis.text.x=element_text(size=14),axis.text.y=element_text(size=14),legend.title=element_text(size=14))
+
+fig.2 <- grid.arrange(fig.2a,fig.2b,ncol=1)
+
+
+```
+
+
+
+
+
+```{r}
+#obtain deviance explained
+q2 <- q %>% filter(virus %in% z$virus)
+library(ResourceSelection)
+de <- NULL
+for (i in 1:16){
+  modNum=i
+  tmp <- summary(get(paste("model.",i,sep="")))
+  dev.exp <- 1-tmp$deviance/tmp$null.deviance
+  de <- c(de,dev.exp)
+}
+```
+
+

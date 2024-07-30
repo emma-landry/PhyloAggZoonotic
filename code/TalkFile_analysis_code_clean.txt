@@ -1,0 +1,339 @@
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.impute import SimpleImputer
+import matplotlib.pyplot as plt
+from sklearn.manifold import MDS
+import matplotlib.cm as cm
+import numpy as np
+from sklearn.manifold import TSNE
+from scipy.spatial.distance import cosine, euclidean
+
+virus_name_encoder = LabelEncoder()
+host_name_encoder = LabelEncoder()
+virus_order_encoder = LabelEncoder()
+host_order_encoder = LabelEncoder()
+virus_re['virus_id'] = virus_name_encoder.fit_transform(virus_re['vVirusNameCorrected'])
+associations['virus_id'] = virus_name_encoder.transform(associations['vVirusNameCorrected'])
+hosts_re['host_id'] = host_name_encoder.fit_transform(hosts_re['hHostNameFinal'])
+associations['host_id'] = host_name_encoder.transform(associations['hHostNameFinal'])
+virus_re['virus_order_name'] = virus_re['vOrder']
+hosts_re['host_order_name'] = hosts_re['hOrder']
+virus_re['virus_order_id'] = virus_order_encoder.fit_transform(virus_re['vOrder'])
+hosts_re['host_order_id'] = host_order_encoder.fit_transform(hosts_re['hOrder'])
+
+continuous_cols_virus = ['vGenomeMinLength', 'vGenomeMaxLength', 'vGenomeAveLength' ,'vWOKcites', 'vPubMedCites']  
+binary_cols_virus = ['ReverseZoonoses', 'IsHoSa', 'IsHoSa.stringent', 'vCytoReplicTF', 'vSegmentedTF', 'vVectorYNna', 'vSSoDS', 'vDNAoRNA', 'vEnvelope', 'IsZoonotic', 'IsZoonotic.stringent']  
+exclude_cols_virus = ['vVirusNameCorrected', 'vOrder', 'virus_id', 'virus_order_name', 'vFamily', 'vSubfamily', 'vGenus']
+continuous_cols_host = ['hMassGrams', 'S', 'S20', 'S40', 'S50', 'S80', 'S100', 'AreaHost', 'Area.crop', 'crop.perc', 'Area.pasture',
+       'pasture.perc', 'Area.urban', 'urban.perc', 'popc_1970AD',
+       'popc_1980AD', 'popc_1990AD', 'popc_2000AD', 'popc_2005AD',
+       'rurc_1970AD', 'rurc_1980AD', 'rurc_1990AD', 'rurc_2000AD',
+       'rurc_2005AD', 'urbc_1970AD', 'urbc_1980AD', 'urbc_1990AD',
+       'urbc_2000AD', 'urbc_2005AD', 'p_crop1970', 'p_grass1970', 'p_uopp1970',
+       'p_crop1980', 'p_grass1980', 'p_uopp1980', 'p_crop1990', 'p_grass1990',
+       'p_uopp1990', 'p_crop2000', 'p_grass2000', 'p_uopp2000', 'p_crop2005',
+       'p_grass2005', 'p_uopp2005']  
+binary_cols_host = ['host_order_id']  
+exclude_cols_host = ['hHostNameFinal', 'hOrder', 'host_id', 'host_order_name', 'host_order_id', 'hFamily', 'hGenus', 'hSpecies']
+
+def impute_missing_values(df, continuous_cols, binary_cols):
+    imputer_cont = SimpleImputer(strategy='mean')
+    df[continuous_cols] = imputer_cont.fit_transform(df[continuous_cols])
+    
+    imputer_bin = SimpleImputer(strategy='most_frequent')
+    df[binary_cols] = imputer_bin.fit_transform(df[binary_cols])
+    
+    return df
+
+##################
+
+# 1. MDS by order
+
+##################
+
+mds_virus = MDS(n_components=2, random_state=42)
+mds_virus_results = mds_virus.fit_transform(virus_features)
+mds_hosts = MDS(n_components=2, random_state=42)
+mds_hosts_results = mds_hosts.fit_transform(host_features)
+
+mds_virus_df = pd.DataFrame(mds_virus_results, columns=['MDS1', 'MDS2'])
+mds_virus_df['virus_order_id'] = virus_re['virus_order_id']
+mds_virus_df['virus_order_name'] = virus_re['virus_order_name']
+mds_virus_df['vVirusNameCorrected'] = virus_re['vVirusNameCorrected']
+mds_virus_df['vOrder'] = virus_re['vOrder']
+mds_virus_df['vFamily'] = virus_re['vFamily']
+mds_virus_df['vSubfamily'] = virus_re['vSubfamily']
+mds_virus_df['vGenus'] = virus_re['vGenus']
+
+mds_hosts_df = pd.DataFrame(mds_hosts_results, columns=['MDS1', 'MDS2'])
+mds_hosts_df['host_order_id'] = hosts_re['host_order_id']
+mds_hosts_df['host_order_name'] = hosts_re['host_order_name']
+mds_hosts_df['hHostNameFinal'] = hosts_re['hHostNameFinal']
+mds_hosts_df['hOrder'] = hosts_re['hOrder']
+mds_hosts_df['host_id'] = hosts_re['host_id']
+mds_hosts_df['hFamily'] = hosts_re['hFamily']
+mds_hosts_df['hGenus'] = hosts_re['hGenus']
+mds_hosts_df['hSpecies'] = hosts_re['hSpecies']
+
+def plot_mds_with_discrete_legend(df, order_col, order_name_col, title):
+    unique_orders = df[[order_col, order_name_col]].drop_duplicates().sort_values(by=order_col)
+    colors = cm.get_cmap('viridis', len(unique_orders))
+    
+    plt.figure(figsize=(12, 8))
+    
+    for i, (order, order_name) in enumerate(zip(unique_orders[order_col], unique_orders[order_name_col])):
+        order_df = df[df[order_col] == order]
+        plt.scatter(order_df['MDS1'], order_df['MDS2'], color=colors(i), label=order_name, alpha=0.6, s=50)
+    
+    plt.title(title)
+    plt.xlabel('MDS1')
+    plt.ylabel('MDS2')
+    plt.legend(title=order_name_col, bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+
+####################################
+
+# 2. MDS by other factors (for virus)
+
+####################################
+
+mds_virus = MDS(n_components=2, random_state=43)
+mds_virus_results = mds_virus.fit_transform(virus_features)
+mds_virus_df = pd.DataFrame(mds_virus_results, columns=['MDS1', 'MDS2'])
+mds_virus_df['ReverseZoonoses'] = virus_re['ReverseZoonoses']
+mds_virus_df['vDNAoRNA'] = virus_re['vDNAoRNA']
+mds_virus_df['vEnvelope'] = virus_re['vEnvelope']
+mds_virus_df['IsZoonotic'] = virus_re['IsZoonotic']
+
+def plot_mds_colored_by_binary(mds_df, binary_col, title):
+    unique_values = mds_df[binary_col].unique()
+    colors = cm.get_cmap('viridis', len(unique_values))
+    
+    plt.figure(figsize=(12, 8))
+    
+    for i, value in enumerate(unique_values):
+        subset = mds_df[mds_df[binary_col] == value]
+        plt.scatter(subset['MDS1'], subset['MDS2'], color=colors(i), label=f'{binary_col}={value}', alpha=0.6, s=50)
+    
+    plt.title(title)
+    plt.xlabel('MDS1')
+    plt.ylabel('MDS2')
+    plt.legend(title=binary_col, bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+####################################
+
+# 3. MDS by virus order (for hosts)
+
+####################################
+mds_hosts_df = mds_hosts_df.merge(associations[['host_id', 'virus_id']], on='host_id', how='left')
+mds_hosts_df = mds_hosts_df.merge(virus_re[['virus_id', 'virus_order_name']], on='virus_id', how='left')
+
+def plot_mds_colored_by_virus_order(mds_df, title):
+    unique_orders = mds_df['virus_order_name'].unique()
+    colors = cm.get_cmap('viridis', len(unique_orders))
+    
+    plt.figure(figsize=(12, 8))
+    
+    for i, order in enumerate(unique_orders):
+        subset = mds_df[mds_df['virus_order_name'] == order]
+        plt.scatter(subset['MDS1'], subset['MDS2'], color=colors(i), label=order, alpha=0.6, s=50)
+    
+    plt.title(title)
+    plt.xlabel('MDS1')
+    plt.ylabel('MDS2')
+    plt.legend(title='Virus Order', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+
+####################################
+
+# 3. MDS by virus family, genus, subfamily (for hosts)
+
+####################################
+
+mds_hosts_df = mds_hosts_df.merge(associations[['host_id', 'virus_id']], on='host_id', how='left')
+mds_hosts_df = mds_hosts_df.merge(virus_re[['virus_id', 'vFamily']], on='virus_id', how='left')
+mds_hosts_df = mds_hosts_df.merge(virus_re[['virus_id', 'vSubfamily' ]], on='virus_id', how='left')
+mds_hosts_df = mds_hosts_df.merge(virus_re[['virus_id', 'vGenus' ]], on='virus_id', how='left')
+
+def plot_mds_colored_by_virus_order(mds_df, title):
+    unique_orders = mds_df['vFamily'].unique()
+    colors = cm.get_cmap('viridis', len(unique_orders))
+    
+    plt.figure(figsize=(12, 8))
+    
+    for i, order in enumerate(unique_orders):
+        subset = mds_df[mds_df['vFamily'] == order]
+        plt.scatter(subset['MDS1'], subset['MDS2'], color=colors(i), label=order, alpha=0.6, s=50)
+    
+    plt.title(title)
+    plt.xlabel('MDS1')
+    plt.ylabel('MDS2')
+    plt.legend(title='Virus vFamily', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+
+####################################
+
+# t-SNE analysis
+
+####################################
+tsne_virus = TSNE(n_components=2, random_state=42)
+tsne_virus_results = tsne_virus.fit_transform(virus_features)
+tsne_hosts = TSNE(n_components=2, random_state=42)
+tsne_hosts_results = tsne_hosts.fit_transform(host_features)
+
+tsne_virus_df = pd.DataFrame(tsne_virus_results, columns=['tSNE1', 'tSNE2'])
+tsne_virus_df['virus_order_id'] = virus_re['virus_order_id']
+tsne_virus_df['virus_order_name'] = virus_re['virus_order_name']
+tsne_virus_df['vVirusNameCorrected'] = virus_re['vVirusNameCorrected']
+tsne_virus_df['vOrder'] = virus_re['vOrder']
+tsne_virus_df['vFamily'] = virus_re['vFamily']
+tsne_virus_df['vSubfamily'] = virus_re['vSubfamily']
+tsne_virus_df['vGenus'] = virus_re['vGenus']
+
+tsne_hosts_df = pd.DataFrame(tsne_hosts_results, columns=['tSNE1', 'tSNE2'])
+tsne_hosts_df['host_order_id'] = hosts_re['host_order_id']
+tsne_hosts_df['host_order_name'] = hosts_re['host_order_name']
+tsne_hosts_df['hHostNameFinal'] = hosts_re['hHostNameFinal']
+tsne_hosts_df['hOrder'] = hosts_re['hOrder']
+tsne_hosts_df['host_id'] = hosts_re['host_id']
+tsne_hosts_df['hFamily'] = hosts_re['hFamily']
+tsne_hosts_df['hGenus'] = hosts_re['hGenus']
+tsne_hosts_df['hSpecies'] = hosts_re['hSpecies']
+
+def plot_tsne_with_discrete_legend(df, order_col, order_name_col, title):
+    unique_orders = df[[order_col, order_name_col]].drop_duplicates().sort_values(by=order_col)
+    colors = cm.get_cmap('viridis', len(unique_orders))
+    
+    plt.figure(figsize=(12, 8))
+    
+    for i, (order, order_name) in enumerate(zip(unique_orders[order_col], unique_orders[order_name_col])):
+        order_df = df[df[order_col] == order]
+        plt.scatter(order_df['tSNE1'], order_df['tSNE2'], color=colors(i), label=order_name, alpha=0.6, s=50)
+    
+    plt.title(title)
+    plt.xlabel('tSNE1')
+    plt.ylabel('tSNE2')
+    plt.legend(title=order_name_col, bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+plot_tsne_with_discrete_legend(tsne_virus_df, 'virus_order_id', 'virus_order_name', 't-SNE for Virus Data')
+plot_tsne_with_discrete_legend(tsne_virus_df, 'virus_order_id', 'virus_order_name', 't-SNE for Virus Data')
+plot_tsne_with_discrete_legend(tsne_hosts_df, 'host_order_id', 'host_order_name', 't-SNE for Host Data')
+tsne_hosts_df = tsne_hosts_df.merge(associations[['host_id', 'virus_id']], on='host_id', how='left')
+tsne_hosts_df = tsne_hosts_df.merge(virus_re[['virus_id', 'vFamily']], on='virus_id', how='left')
+tsne_hosts_df = tsne_hosts_df.merge(virus_re[['virus_id', 'vSubfamily' ]], on='virus_id', how='left')
+tsne_hosts_df = tsne_hosts_df.merge(virus_re[['virus_id', 'vGenus' ]], on='virus_id', how='left')
+
+def plot_tsne_colored_by_virus_order(tsne_df, title):
+    unique_orders = tsne_df['vFamily'].unique()
+    colors = cm.get_cmap('viridis', len(unique_orders))
+    
+    plt.figure(figsize=(12, 8))
+    
+    for i, order in enumerate(unique_orders):
+        subset = tsne_df[tsne_df['vFamily'] == order]
+        plt.scatter(subset['tSNE1'], subset['tSNE2'], color=colors(i), label=order, alpha=0.6, s=50)
+    
+    plt.title(title)
+    plt.xlabel('tSNE1')
+    plt.ylabel('tSNE2')
+    plt.legend(title='Virus vFamily', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.show()
+
+plot_tsne_colored_by_virus_order(tsne_hosts_df, 't-SNE for Host Data Colored by Virus Family')
+
+assoc_host_orders = associations.merge(hosts_re[['host_id', 'host_order_name']], on='host_id')
+virus_host_order_diversity = assoc_host_orders.groupby('virus_id')['host_order_name'].nunique().reset_index()
+virus_host_order_diversity.columns = ['virus_id', 'unique_host_orders']
+virus_host_order_diversity = virus_host_order_diversity.merge(virus_re[['virus_id', 'virus_order_name']], on='virus_id')
+
+### Group by virus order and calculate the average number of unique host orders affected
+virus_order_diversity = virus_host_order_diversity.groupby('virus_order_name')['unique_host_orders'].mean().reset_index()
+virus_order_diversity = virus_order_diversity.sort_values(by='unique_host_orders', ascending=False)
+
+virus_order_diversity
+
+### Identify the virus order with the highest average number of unique host orders affected
+most_diverse_virus_order = virus_order_diversity.iloc[4]['virus_order_name']
+print(f"Virus order affecting the most diverse set of host orders: {most_diverse_virus_order}")
+
+### Analyze the association with IsZoonotic
+most_diverse_virus_order_data = virus_re[virus_re['virus_order_name'] == most_diverse_virus_order]
+is_zoonotic_counts = most_diverse_virus_order_data['IsZoonotic'].value_counts(normalize=True)
+print(f"IsZoonotic distribution for virus order {most_diverse_virus_order}:")
+print(is_zoonotic_counts)
+
+assoc_host_orders = associations.merge(hosts_re[['host_id', 'hOrder']], on='host_id')
+virus_host_order_diversity = assoc_host_orders.groupby('virus_id')['hOrder'].nunique().reset_index()
+virus_host_order_diversity.columns = ['virus_id', 'unique_host_orders']
+virus_host_order_diversity = virus_host_order_diversity.merge(virus_re[['virus_id', 'vVirusNameCorrected']], on='virus_id')
+top_10_viruses = virus_host_order_diversity.sort_values(by='unique_host_orders', ascending=False).head(10)
+
+assoc_host_orders = associations.merge(hosts_re[['host_id', 'hOrder']], on='host_id')
+virus_host_order_diversity = assoc_host_orders.groupby('virus_id')['hOrder'].nunique().reset_index()
+virus_host_order_diversity.columns = ['virus_id', 'unique_host_orders']
+virus_host_order_diversity = virus_host_order_diversity.merge(virus_re[['virus_id', 'vVirusNameCorrected']], on='virus_id')
+top_10_viruses = virus_host_order_diversity.sort_values(by='unique_host_orders', ascending=False).head(10)
+
+print("Top 10 viruses affecting the most number of host orders:")
+print(top_10_viruses[['vVirusNameCorrected', 'unique_host_orders']])
+
+assoc_host_names = associations.merge(hosts_re[['host_id', 'hHostNameFinal']], on='host_id')
+virus_host_diversity = assoc_host_names.groupby('virus_id')['hHostNameFinal_x'].nunique().reset_index()
+virus_host_diversity.columns = ['virus_id', 'unique_hosts']
+virus_host_diversity = virus_host_diversity.merge(virus_re[['virus_id', 'vVirusNameCorrected']], on='virus_id')
+top_50_viruses = virus_host_diversity.sort_values(by='unique_hosts', ascending=False).head(50)
+
+# Display the result
+def plot_top_viruses_by_host_count(merged_data, host_level, title):
+    host_counts = merged_data.groupby(['vVirusNameCorrected', 'IsZoonotic'])[host_level].nunique().reset_index()
+    host_counts = host_counts.rename(columns={host_level: 'HostCount'})
+    top_viruses = host_counts.nlargest(10, 'HostCount')
+    plt.figure(figsize=(12, 8))
+    barplot = sns.barplot(x='HostCount', y='vVirusNameCorrected', hue='IsZoonotic', data=top_viruses, palette={0: 'gray', 1: 'gray'})
+    plt.title(title)
+    plt.xlabel(f'Number of Unique Hosts ({host_level})')
+    plt.ylabel('Virus')
+    plt.legend(title='IsZoonotic', loc='upper right')
+    hatches = ['/', None]  
+    for bar, is_zoonotic in zip(barplot.patches, top_viruses['IsZoonotic']):
+        bar.set_hatch(hatches[is_zoonotic])
+    
+    plt.show()
+
+
+##### Calculating Centroid
+def calculate_centroids(reduced_hosts, hosts_vectors, associations):
+    centroids = {}
+    unique_viruses = associations['virus'].unique()
+    
+    for virus in unique_viruses:
+        virus_hosts = associations[associations['virus'] == virus]['host']
+        host_indices = hosts_vectors.index.isin(virus_hosts)
+        centroids[virus] = np.mean(reduced_hosts[host_indices, :], axis=0)
+    
+    return centroids
+
+##### Finding the host closest to the centroid
+def find_closest_hosts(reduced_hosts, centroids, hosts_vectors, associations):
+    closest_hosts = {}
+    unique_viruses = associations['virus'].unique()
+    
+    for virus in unique_viruses:
+        virus_hosts = associations[associations['virus'] == virus]['host']
+        host_indices = hosts_vectors.index.isin(virus_hosts)
+        distances = [euclidean(reduced_hosts[i], centroids[virus]) for i in range(len(reduced_hosts)) if host_indices[i]]
+        closest_host_index = np.argmin(distances)
+        closest_hosts[virus] = hosts_vectors.index[host_indices][closest_host_index]
+    
+    return closest_hosts
+
+##### Calculating cosine distance 
+def calculate_cosine_distance_from_centroid(group):
+    centroid = group.mean(axis=0)
+    distances = cosine_distances(group, centroid.reshape(1, -1))
+    return distances.flatten()
